@@ -1,0 +1,67 @@
+library(quantmod)
+library(ggplot2)
+library(reshape2)
+library(farver)
+library(dplyr)
+
+setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/project/Fac')
+Fac <- read.table('Fivefac.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+head(Fac)
+str(Fac)
+Fac <- Fac[Fac$MarkettypeID == 'P9709'& Fac$Portfolios == 1,c(2,4,6,8,10,12)]
+Fac$TradingDate <- as.Date(Fac$TradingDate)
+colnames(Fac) <- c('Trddt','MAR','SMB','HML','RMW','CMA')
+head(Fac)
+setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/project/Fac')
+stk <- read.table('SSE50.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+stk$Stkcd <- as.character(stk$Stkcd)
+stk$Trddt <- as.Date(stk$Trddt)
+head(stk)
+stkCls <- dcast(stk,Trddt~Stkcd,value.var = 'Clsprc')
+stkCls[1:5,1:5]
+
+da <- stkCls[,1]
+title <- 'Closing Price'
+p1<-data.frame(date=da,ma=stkCls[,2],type=rep('600000',length(da)))
+p2<-data.frame(date=da,ma=stkCls[,3],type=rep('600016',length(da)))
+p3<-data.frame(date=da,ma=stkCls[,4],type=rep('600019',length(da)))
+p4<-data.frame(date=da,ma=stkCls[,5],type=rep('600028',length(da)))
+pdata<-rbind(p1,p2,p3,p4)
+ggplot(pdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.9,0.75))+geom_line(size=0.6)+ylab('Closing Price')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+    
+names <- colnames(stkCls)
+myfun <- function(x){x <- c(NA,diff(log(x)))}
+stkRet <- as.data.frame(apply(stkCls[2:ncol(stkCls)],2,myfun))
+stkRet <- cbind(stkCls[,1],stkRet)
+colnames(stkRet) <- names 
+stkRet$Trddt <- as.Date(stkRet$Trddt)
+stkRet[1:5,1:5]
+
+da <- stkRet[-1,1]
+title <- 'log Returns'
+r1<-data.frame(date=da,ma=stkRet[-1,2],type=rep('600000',length(da)))
+r2<-data.frame(date=da,ma=stkRet[-1,3],type=rep('600016',length(da)))
+r3<-data.frame(date=da,ma=stkRet[-1,4],type=rep('600019',length(da)))
+r4<-data.frame(date=da,ma=stkRet[-1,5],type=rep('600028',length(da)))
+rdata<-rbind(r1,r2,r3,r4)
+ggplot(rdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.9,0.25))+geom_line(size=0.5)+ylab('log Returns')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+    
+Fac <- Fac[Fac$Trddt %in% stkRet$Trddt,]
+dt <- merge(Fac,stkRet)
+dt[1:5,1:12]
+
+qq <- quantile(dt$`600000`, seq(0, 1, 0.2), na.rm = TRUE)
+qq
+mutate(dt, return.quint = cut(`600000`, qq)) %>% 
+  group_by(return.quint) %>% 
+  summarize(f1 = mean(MAR, na.rm = TRUE), 
+            f2 = mean(SMB, na.rm = TRUE), 
+            f3 = mean(HML, na.rm = TRUE),
+            f4 = mean(RMW, na.rm = TRUE),
+            f5 = mean(CMA, na.rm = TRUE)) 
