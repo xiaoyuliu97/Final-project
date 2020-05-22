@@ -48,4 +48,5 @@ All workflow information is contained in the Reproduce.R script. The general ste
 2. Fama-French Five Factor based Stock Selection
 
 Then all the pictures in my slides and report are reproduced.
+
 Run EDA.R and backtest.R. Then all the pictures in my slides and report are reproduced.
