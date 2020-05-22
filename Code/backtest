@@ -4,13 +4,12 @@ require(reshape2)
 require(farver)
 require(dplyr)
 
-setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/project/Fac')
-Fac <- read.table('Fivefac.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
-Fac <- Fac[Fac$MarkettypeID == 'P9709'& Fac$Portfolios == 1,c(2,4,6,8,10,12)]#取出全A股市场的序列
-Fac$TradingDate <- as.Date(Fac$TradingDate)##设为是时间格式后续可匹配
+Fac <- read.table('Data/Fivefac.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+Fac <- Fac[Fac$MarkettypeID == 'P9709'& Fac$Portfolios == 1,c(2,4,6,8,10,12)]
+Fac$TradingDate <- as.Date(Fac$TradingDate)
 colnames(Fac) <- c('Trddt','MAR','SMB','HML','RMW','CMA')
 
-stk <- read.table('SSE50.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+stk <- read.table('Data/SSE50.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
 stk$Stkcd <- as.character(stk$Stkcd)
 stk$Trddt <- as.Date(stk$Trddt)
 stkCls <- dcast(stk,Trddt~Stkcd,value.var = 'Clsprc')
