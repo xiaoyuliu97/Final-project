@@ -31,6 +31,7 @@ Platform: x86_64-apple-darwin15.6.0 (64-bit) were used in the project. And The n
 - reshape2, version 1.4.3 (https://cloud.r-project.org/web/packages/reshape2/index.html)
 - farver, version 2.0.3 (https://cloud.r-project.org/web/packages/farver/index.html)
 - dplyr, version 0.8.5 (https://cloud.r-project.org/web/packages/dplyr/index.html)
+
 Computer information:
 CPU: 2.4 GHz Intel Core i5, 8 GB 2133 MHz LPDDR3. 
 
