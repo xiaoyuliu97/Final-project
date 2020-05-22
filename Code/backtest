@@ -1,0 +1,76 @@
+require(quantmod)
+require(ggplot2)
+require(reshape2)
+require(farver)
+require(dplyr)
+
+setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/project/Fac')
+Fac <- read.table('Fivefac.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+Fac <- Fac[Fac$MarkettypeID == 'P9709'& Fac$Portfolios == 1,c(2,4,6,8,10,12)]#取出全A股市场的序列
+Fac$TradingDate <- as.Date(Fac$TradingDate)##设为是时间格式后续可匹配
+colnames(Fac) <- c('Trddt','MAR','SMB','HML','RMW','CMA')
+
+stk <- read.table('SSE50.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+stk$Stkcd <- as.character(stk$Stkcd)
+stk$Trddt <- as.Date(stk$Trddt)
+stkCls <- dcast(stk,Trddt~Stkcd,value.var = 'Clsprc')
+names <- colnames(stkCls)
+myfun <- function(x){x <- c(NA,diff(log(x)))}
+stkRet <- as.data.frame(apply(stkCls[2:ncol(stkCls)],2,myfun))
+stkRet <- cbind(stkCls[,1],stkRet)
+colnames(stkRet) <- names 
+stkRet$Trddt <- as.Date(stkRet$Trddt)
+Fac <- Fac[Fac$Trddt %in% stkRet$Trddt,]
+dt <- merge(Fac,stkRet)
+
+stk_Sel <- function(dtSmp){
+  sym <- rep(NA,100)
+  alpha <- rep(NA,100)
+  tgstk <- data.frame(sym,alpha)
+  for(i in 7:(ncol(dtSmp)-1)){
+    tra <- dtSmp[,c(1:6,i)]
+    colnames(tra) <- c(names(Fac),'logRet')
+    glm <- glm(formula = 'logRet~MAR+SMB+HML+RMW+CMA',data = tra)
+    tgstk$sym[i] <- colnames(dtSmp)[i]
+    tgstk$alpha[i] <- glm$coefficients[1]
+  }
+  tgstk<- na.omit(tgstk[order(-tgstk$alpha),])[1:5,]
+  return(tgstk$sym)
+}
+
+dt1 <- NA
+for(i in seq(101,nrow(dt),30)){
+  tra <- dt[(i-100):(i-1),]
+  stkSel <- stk_Sel(tra)
+  tra2 <-dt[(i):(i+29),]
+  tra2$stk1 <- stkSel[1]
+  tra2$stk2 <- stkSel[2]
+  tra2$stk3 <- stkSel[3]
+  tra2$stk4 <- stkSel[4]
+  tra2$stk5 <- stkSel[5]
+  tra2$ret_daily <- rowSums(tra2[,colnames(tra2)%in%stkSel],na.rm = T)
+  dt1 <- rbind(dt1,tra2)
+}
+dt1 <- dt1[-1,]
+Trade <- dt1[,c(1,(ncol(dt1)-6):ncol(dt1))]
+Trade <- na.omit(Trade)
+
+Trade$ret_acml <- 0
+Trade$ret_SSEIdx <- 0
+for(i in 1:nrow(Trade)){
+  Trade$ret_acml[i] <- (sum(Trade$ret_daily[1:i]))
+  Trade$ret_SSEIdx[i] <- sum(Trade$SSEIdx[1:i])
+}
+
+Lokup <- function(Trade){
+  dd <- Trade$Trddt
+  title <- 'BackTest Returns'
+  k1<-data.frame(date=dd,ma=Trade$ret_acml,type=rep('Fac',length(dd)))
+  k2<-data.frame(date=dd,ma=Trade$ret_SSEIdx,type=rep('SSEIdx',length(dd)))
+  kdata<-rbind(k1,k2)
+  ggplot(kdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.85,0.75))+geom_line(size=0.8)+ylab('Price')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+}
+Lokup(Trade)
