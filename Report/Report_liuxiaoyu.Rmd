@@ -1,0 +1,210 @@
+---
+title: "Stock Selection Strategy"
+author: "Xiaoyu Liu"
+output: pdf_document
+---
+
+# 1 Introductioin
+
+Factor is short for influencing factor, or simply understood as index. We all know that stock returns are affected by multiple factors, such as macro, industry, liquidity, company fundamentals, trading sentiment, and so on. The so-called “multi-factor model” is simply to find those factors that are most relevant to stock returns, and use these factors (factors or indicators) to describe stock returns and select stocks.
+
+Multi-factor model is one of the most widely used and most mature quantitative stock selection models in the field of quantitative investment. It is based on modern financial investment theories such as portfolio, capital asset pricing (CAPM) and arbitrage pricing theory (APT). The multi-factor model assumes that the market is inefficient or weakly efficient and obtains excess returns through active portfolio management. The core idea of multi-factor stock selection is that market forces are multiple and dynamic, but there are always factors that are stable over time. In the practice of quantification, different multi-factor models are constructed because different market participants or analysts have different understandings of market dynamics and factors.
+
+# 2 Data Preprocessing
+## 2.1 Data resources
+Our datasets are downloaded from [CSMAR][http://www.gtarsc.com/#/index]. The first dataset, named Fivefac, comes from stocks with different market types. Fivefac consists of 20961 samples and 12 variables, including trading date, portfolios and 10 factors. The second dataset, named SSE50, covers different stocks and their closing price. Fivefac consists of 52722 rows and 3 columns, including trading date and closing price.
+
+## 2.2 Data processing
+The following packages will be used in this project:
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(quantmod)
+library(ggplot2)
+library(reshape2)
+library(farver)
+library(dplyr)
+```
+
+### Data 1: Stocks and factors
+```{r}
+setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/1st term/project/Fac')
+Fac <- read.table('Fivefac.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+head(Fac)
+```
+
+Let us have a quick look at our data, especially the variables:
+```{r}
+str(Fac)
+```
+
+Then we extract certain part of the original dataset, that is a specific type of stock P9709 and five factors renamed as 'Trddt','MAR','SMB','HML', 'RMW' and 'CMA'.
+
+```{r}
+Fac <- Fac[Fac$MarkettypeID == 'P9709'& Fac$Portfolios == 1,c(2,4,6,8,10,12)]
+Fac$TradingDate <- as.Date(Fac$TradingDate)
+colnames(Fac) <- c('Trddt','MAR','SMB','HML','RMW','CMA')
+head(Fac)
+```
+
+### Data 2: Stocks and Returns
+
+```{r}
+setwd('/Users/liuxiaoyu/Desktop/RUC/Advanced_applied_statistics/1st term/project/Fac')
+stk <- read.table('SSE50.csv',sep="\t",header=T,fileEncoding="UCS-2LE",stringsAsFactors = F)
+stk$Stkcd <- as.character(stk$Stkcd)
+stk$Trddt <- as.Date(stk$Trddt)
+head(stk)
+```
+For the convenience of analysis, we transpose the data into the following format, with all stocks as columns.
+```{r}
+stkCls <- dcast(stk,Trddt~Stkcd,value.var = 'Clsprc')
+stkCls[1:5,1:5]
+```
+The following picture demonstrates four stocks, including 600000, 600016, 600019 and 600028, and their closing prices. 
+```{r}
+da <- stkCls[,1]
+title <- 'Closing Price'
+p1<-data.frame(date=da,ma=stkCls[,2],type=rep('600000',length(da)))
+p2<-data.frame(date=da,ma=stkCls[,3],type=rep('600016',length(da)))
+p3<-data.frame(date=da,ma=stkCls[,4],type=rep('600019',length(da)))
+p4<-data.frame(date=da,ma=stkCls[,5],type=rep('600028',length(da)))
+pdata<-rbind(p1,p2,p3,p4)
+ggplot(pdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.9,0.75))+geom_line(size=0.6)+ylab('Closing Price')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+```
+The picture tells us that among the four stocks, it is 600000 whose price changes most dramatically. Next we turn to compute and analyze the returns, which is of our interest, rather than the closing price itself.
+```{r}
+names <- colnames(stkCls)
+myfun <- function(x){x <- c(NA,diff(log(x)))}
+stkRet <- as.data.frame(apply(stkCls[2:ncol(stkCls)],2,myfun))
+stkRet <- cbind(stkCls[,1],stkRet)
+colnames(stkRet) <- names 
+stkRet$Trddt <- as.Date(stkRet$Trddt)
+stkRet[1:5,1:5]
+```
+Also, we present the log returns for the same four stocks.
+```{r}
+da <- stkRet[-1,1]
+title <- 'log Returns'
+r1<-data.frame(date=da,ma=stkRet[-1,2],type=rep('600000',length(da)))
+r2<-data.frame(date=da,ma=stkRet[-1,3],type=rep('600016',length(da)))
+r3<-data.frame(date=da,ma=stkRet[-1,4],type=rep('600019',length(da)))
+r4<-data.frame(date=da,ma=stkRet[-1,5],type=rep('600028',length(da)))
+rdata<-rbind(r1,r2,r3,r4)
+ggplot(rdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.9,0.25))+geom_line(size=0.5)+ylab('log Returns')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+```
+
+### Merge Data 1 and 2
+```{r}
+Fac <- Fac[Fac$Trddt %in% stkRet$Trddt,]
+dt <- merge(Fac,stkRet)
+dt[1:5,1:12]
+```
+
+Take the stock 600000 as an example, we now present the intuitive correlation of returns and five factors.
+
+```{r}
+qq <- quantile(dt$`600000`, seq(0, 1, 0.2), na.rm = TRUE)
+qq
+mutate(dt, return.quint = cut(`600000`, qq)) %>% 
+  group_by(return.quint) %>% 
+  summarize(f1 = mean(MAR, na.rm = TRUE), 
+            f2 = mean(SMB, na.rm = TRUE), 
+            f3 = mean(HML, na.rm = TRUE),
+            f4 = mean(RMW, na.rm = TRUE),
+            f5 = mean(CMA, na.rm = TRUE)) 
+```
+
+# 3 Fama-French Five Factor model
+
+**Step1**: The Fama-Frentch five-factor model was used to regression the return series of 50 stocks in Shanghai in the first 100 trading days to obtain the corresponding $\alpha$ of each stock. More precisely,
+$$R_t = \alpha + m\cdot MAR_t + s\cdot SMB_t + h\cdot HML_t + r\cdot RMW_t + c\cdot CMA_t +e_t$$
+
+**Step 2**: Rank the alpha of each stock, taking the top five stocks with alpha largest.
+
+**Step 3**: Equal-weighted allocation of 5 stocks acquired and held for 30 trading days.
+    
+**Step 4**: Portfolio reallocation every 30 days.
+    
+**Step 5**: Return to Step 1.
+
+The algorithm can be presented as in the following figure. 
+
+```{r, echo=FALSE, fig.cap='Fama-French stock selection strategy', out.width = '100%', fig.align='center'}
+knitr::include_graphics("figure1.png")
+```
+
+```{r}
+stk_Sel <- function(dtSmp){
+  sym <- rep(NA,100)
+  alpha <- rep(NA,100)
+  tgstk <- data.frame(sym,alpha)
+  for(i in 7:(ncol(dtSmp)-1)){
+    tra <- dtSmp[,c(1:6,i)]
+    colnames(tra) <- c(names(Fac),'logRet')
+    glm <- glm(formula = 'logRet~MAR+SMB+HML+RMW+CMA',data = tra)
+    tgstk$sym[i] <- colnames(dtSmp)[i]
+    tgstk$alpha[i] <- glm$coefficients[1]
+  }
+  tgstk<- na.omit(tgstk[order(-tgstk$alpha),])[1:5,]
+  return(tgstk$sym)
+}
+
+dt1 <- NA
+for(i in seq(101,nrow(dt),30)){
+  tra <- dt[(i-100):(i-1),]
+  stkSel <- stk_Sel(tra)
+  tra2 <-dt[(i):(i+29),]
+  tra2$stk1 <- stkSel[1]
+  tra2$stk2 <- stkSel[2]
+  tra2$stk3 <- stkSel[3]
+  tra2$stk4 <- stkSel[4]
+  tra2$stk5 <- stkSel[5]
+  tra2$ret_daily <- rowSums(tra2[,colnames(tra2)%in%stkSel],na.rm = T)
+  dt1 <- rbind(dt1,tra2)
+}
+dt1 <- dt1[-1,]
+Trade <- dt1[,c(1,(ncol(dt1)-6):ncol(dt1))]
+Trade <- na.omit(Trade)
+```
+
+
+# 5 Results
+
+```{r}
+Trade$ret_acml <- 0
+Trade$ret_SSEIdx <- 0
+for(i in 1:nrow(Trade)){
+  Trade$ret_acml[i] <- (sum(Trade$ret_daily[1:i]))
+  Trade$ret_SSEIdx[i] <- sum(Trade$SSEIdx[1:i])
+}
+
+head(Trade)
+```
+
+Trade data set shows our stock selection process, each selected stock combination will be held for 30 days.
+
+```{r}
+Lokup <- function(Trade){
+  dd <- Trade$Trddt
+  title <- 'BackTest Returns'
+  k1<-data.frame(date=dd,ma=Trade$ret_acml,type=rep('Fac',length(dd)))
+  k2<-data.frame(date=dd,ma=Trade$ret_SSEIdx,type=rep('SSEIdx',length(dd)))
+  kdata<-rbind(k1,k2)
+  ggplot(kdata,aes(x=date, y=ma,color=type))+
+    theme(legend.position=c(0.85,0.75))+geom_line(size=0.8)+ylab('Price')+
+    ggtitle(title)+
+    theme(plot.title=element_text(size=14,hjust=0.5,colour='black',face='bold'))
+}
+Lokup(Trade)
+```
+
+
+# 6 Discussion and Future Plan
+From the backtest chart, we can also see that when using the Fama-French-based stock selection strategy, our return is greater than the average return of the Shanghai 50 constituent stocks.
+However, we mention that this strategy is far from satisfactory. First of all, the difference of log return between our selected stocks and Shanghai 50 constituent stocks is not numerically obvious at. Secondly, the performance of stocks selected by stock selection strategies is significantly more unstable, that is, stockholders need to bear greater risks, which is obviously unacceptable to many risk aversion. Therefore, in future work we will choose a more advanced model as our new stock selection strategy.
